@@ -40,3 +40,4 @@ Le système est composé de deux briques principales :
 Lancer le serveur centralisé en précisant le port d'écoute :
 ```bash
 python3 server_central.py <port_serveur>
+
