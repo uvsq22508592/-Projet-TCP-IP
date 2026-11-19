@@ -91,6 +91,16 @@ python3 peer_node.py \
   --search musique
 ```
 
+Pour afficher tous les fichiers publiés sans mot-clé :
+
+```bash
+python3 peer_node.py \
+  --username bob \
+  --password secret \
+  --central-port 5000 \
+  --list
+```
+
 Le fichier peut ensuite être téléchargé directement depuis le peer :
 
 ```bash

@@ -79,16 +79,14 @@ def list_shared_files(shared_dir):
     for root, _, filenames in os.walk(shared_dir):
         for filename in filenames:
             path = os.path.join(root, filename)
+            relative_path = os.path.relpath(path, shared_dir)
 
             files.append({
                 "name": filename,
-                "relative_path": os.path.relpath(
-                    path,
-                    shared_dir,
-                ),
+                "relative_path": relative_path,
                 "size": os.path.getsize(path),
                 "description": (
-                    f"Fichier partagé : {filename}"
+                    f"Fichier partagé : {relative_path}"
                 ),
             })
 

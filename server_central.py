@@ -109,7 +109,8 @@ class CentralServer:
                     "peer_port": peer["port"],
                 }
 
-                text = f"{filename} {description}"
+                relative_path = file_info.get("relative_path", filename)
+                text = f"{filename} {relative_path} {description}"
 
                 for keyword in keywords_from_text(text):
                     if entry not in self.file_index[keyword]:
@@ -138,6 +139,32 @@ class CentralServer:
                     if identifier not in already_found:
                         already_found.add(identifier)
                         results.append(file_info)
+
+        return {
+            "status": "OK",
+            "results": results,
+        }
+
+    def list_files(self):
+        results = []
+        already_found = set()
+
+        with self.lock:
+            for username, peer in self.peers.items():
+                for file_info in peer["files"]:
+                    filename = file_info.get("name", "")
+                    identifier = (username, file_info.get("relative_path", filename))
+
+                    if identifier not in already_found:
+                        already_found.add(identifier)
+                        results.append({
+                            "username": username,
+                            "filename": filename,
+                            "relative_path": file_info.get("relative_path", filename),
+                            "description": file_info.get("description", ""),
+                            "peer_host": peer["host"],
+                            "peer_port": peer["port"],
+                        })
 
         return {
             "status": "OK",
@@ -209,6 +236,9 @@ class CentralServer:
 
         if command == "SEARCH":
             return self.search(request.get("query", ""))
+
+        if command == "LIST_FILES":
+            return self.list_files()
 
         if command == "PING":
             return self.ping(request.get("username"))

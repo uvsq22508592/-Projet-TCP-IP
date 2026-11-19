@@ -85,6 +85,11 @@ class PeerNode:
             "query": query,
         })
 
+    def list_files(self):
+        return self.central_request({
+            "cmd": "LIST_FILES",
+        })
+
     def download_file(self, peer_host, peer_port, filename, destination_path):
         """Download a shared file from another peer."""
         destination_path = os.path.abspath(destination_path)
@@ -286,6 +291,7 @@ def main():
     parser.add_argument("--register", action="store_true")
     parser.add_argument("--login", action="store_true")
     parser.add_argument("--search")
+    parser.add_argument("--list", action="store_true")
     parser.add_argument("--download-host")
     parser.add_argument("--download-port", type=int)
     parser.add_argument("--download-file")
@@ -309,6 +315,10 @@ def main():
 
     if args.search:
         print("Recherche :", peer.search(args.search))
+        return
+
+    if args.list:
+        print("Fichiers publiés :", peer.list_files())
         return
 
     if args.download_file:

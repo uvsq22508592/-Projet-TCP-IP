@@ -61,6 +61,31 @@ class CentralServerTests(unittest.TestCase):
         self.assertEqual(self.server.logout("alice")["status"], "OK")
         self.assertEqual(self.server.search("document")["results"], [])
 
+    def test_list_all_published_files_from_multiple_peers(self):
+        self.server.register("alice", "secret")
+        self.server.register("bob", "secret")
+        self.server.login("alice", "secret", "127.0.0.1", 6001)
+        self.server.login("bob", "secret", "127.0.0.2", 6002)
+        self.server.upload_files(
+            "alice",
+            [
+                {"name": "photo.jpg", "relative_path": "images/photo.jpg"},
+                {"name": "music.mp3", "relative_path": "audio/music.mp3"},
+            ],
+        )
+        self.server.upload_files(
+            "bob",
+            [{"name": "report.pdf", "relative_path": "docs/report.pdf"}],
+        )
+
+        result = self.server.list_files()
+        self.assertEqual(result["status"], "OK")
+        self.assertEqual(len(result["results"]), 3)
+        self.assertEqual(
+            {item["relative_path"] for item in result["results"]},
+            {"images/photo.jpg", "audio/music.mp3", "docs/report.pdf"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

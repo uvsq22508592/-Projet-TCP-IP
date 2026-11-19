@@ -115,6 +115,10 @@ class PeerGui:
             relief="flat",
         ).pack(side="left", fill="x", expand=True, padx=10, ipady=7)
         make_button(search_row, "Rechercher", self.search).pack(side="left")
+        make_button(search_row, "Afficher tous", self.list_all).pack(
+            side="left",
+            padx=(8, 0),
+        )
 
         table_frame = ttk.Frame(self.search_tab)
         table_frame.pack(fill="both", expand=True, pady=(14, 0))
@@ -246,7 +250,27 @@ class PeerGui:
             messagebox.showerror("Recherche", result.get("message", "Échec"))
             return
 
-        self.search_results = result.get("results", [])
+        self.display_results(result.get("results", []))
+
+    def list_all(self):
+        peer = self.peer if self.peer is not None else self.create_peer()
+        if peer is None:
+            return
+        try:
+            result = peer.list_files()
+        except OSError as error:
+            messagebox.showerror("Affichage impossible", str(error))
+            return
+        if result.get("status") != "OK":
+            messagebox.showerror(
+                "Affichage",
+                result.get("message", "Impossible de lister les fichiers"),
+            )
+            return
+        self.display_results(result.get("results", []))
+
+    def display_results(self, results):
+        self.search_results = results
         for item in self.tree.get_children():
             self.tree.delete(item)
         for file_info in self.search_results:
