@@ -80,6 +80,51 @@ class PeerNode:
             "query": query,
         })
 
+    def download_file(self, peer_host, peer_port, filename, destination_path):
+        """Download a shared file from another peer."""
+        destination_path = os.path.abspath(destination_path)
+        destination_dir = os.path.dirname(destination_path)
+        os.makedirs(destination_dir, exist_ok=True)
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect((peer_host, int(peer_port)))
+            send_json(sock, {
+                "cmd": "GET_FILE",
+                "filename": filename,
+            })
+
+            response = recv_json(sock)
+            if response is None:
+                raise ConnectionError("Réponse du peer absente")
+
+            if response.get("status") != "OK":
+                raise RuntimeError(response.get(
+                    "message",
+                    "Téléchargement refusé",
+                ))
+
+            expected_size = response.get("size")
+            if not isinstance(expected_size, int) or expected_size < 0:
+                raise ValueError("Taille de fichier invalide")
+
+            received_size = 0
+            with open(destination_path, "wb") as file:
+                while received_size < expected_size:
+                    data = sock.recv(min(65536, expected_size - received_size))
+                    if not data:
+                        raise ConnectionError(
+                            "Connexion interrompue pendant le téléchargement"
+                        )
+                    file.write(data)
+                    received_size += len(data)
+
+        return {
+            "status": "OK",
+            "filename": response.get("filename", os.path.basename(filename)),
+            "size": received_size,
+            "path": destination_path,
+        }
+
     def ping(self):
         return self.central_request({
             "cmd": "PING",
@@ -186,6 +231,10 @@ def main():
     parser.add_argument("--register", action="store_true")
     parser.add_argument("--login", action="store_true")
     parser.add_argument("--search")
+    parser.add_argument("--download-host")
+    parser.add_argument("--download-port", type=int)
+    parser.add_argument("--download-file")
+    parser.add_argument("--output")
 
     args = parser.parse_args()
 
@@ -205,6 +254,27 @@ def main():
 
     if args.search:
         print("Recherche :", peer.search(args.search))
+        return
+
+    if args.download_file:
+        if not args.download_host or not args.download_port:
+            parser.error(
+                "--download-host et --download-port sont requis "
+                "pour un téléchargement"
+            )
+
+        output = args.output or os.path.basename(args.download_file)
+        try:
+            result = peer.download_file(
+                args.download_host,
+                args.download_port,
+                args.download_file,
+                output,
+            )
+        except (ConnectionError, OSError, RuntimeError, ValueError) as error:
+            parser.error(str(error))
+
+        print("Téléchargement :", result)
         return
 
     if args.login:

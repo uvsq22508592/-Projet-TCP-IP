@@ -40,4 +40,88 @@ Le système est composé de deux briques principales :
 Lancer le serveur centralisé en précisant le port d'écoute :
 ```bash
 python3 server_central.py <port_serveur>
+```
+
+Le port par défaut est `5000` :
+
+```bash
+python3 server_central.py
+```
+
+### 3. Inscription d'un utilisateur
+
+```bash
+python3 peer_node.py \
+  --username alice \
+  --password secret \
+  --central-host 127.0.0.1 \
+  --central-port 5000 \
+  --register
+```
+
+### 4. Connexion et publication des fichiers
+
+Le nœud démarre son serveur de fichiers, se connecte au serveur central et
+publie le contenu de `shared/` :
+
+```bash
+python3 peer_node.py \
+  --username alice \
+  --password secret \
+  --shared-dir shared-alice \
+  --peer-port 6001 \
+  --login
+```
+
+Lancer chaque utilisateur avec un port pair différent.
+
+### 5. Recherche et téléchargement
+
+Une recherche renvoie le nom du fichier ainsi que l'adresse du peer :
+
+```bash
+python3 peer_node.py \
+  --username bob \
+  --password secret \
+  --central-port 5000 \
+  --search musique
+```
+
+Le fichier peut ensuite être téléchargé directement depuis le peer :
+
+```bash
+python3 peer_node.py \
+  --username bob \
+  --password secret \
+  --download-host 127.0.0.1 \
+  --download-port 6001 \
+  --download-file chanson.mp3 \
+  --output downloads/chanson.mp3
+```
+
+Le protocole de transfert utilise une réponse JSON contenant la taille du
+fichier, suivie des octets du fichier sur la même connexion TCP.
+
+## Structure des fichiers
+
+* `server_central.py` : authentification, sessions, index et recherche.
+* `peer_node.py` : serveur de fichiers et client du serveur central.
+* `common.py` : protocole JSON préfixé par la taille et utilitaires partagés.
+* `shared/` : fichiers publiés par défaut.
+* `logs/` : emplacement réservé aux journaux.
+
+## Fonctionnement du heartbeat
+
+Après sa connexion, un peer envoie automatiquement un heartbeat au serveur
+central toutes les 30 secondes. Un peer qui n'envoie plus de heartbeat pendant
+90 secondes est retiré de l'index.
+
+## Vérification
+
+Le projet ne dépend d'aucune bibliothèque externe. Les tests utilisent le
+module `unittest` inclus avec Python :
+
+```bash
+python3 -m unittest discover -v
+```
 
