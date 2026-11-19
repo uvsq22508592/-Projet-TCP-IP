@@ -30,11 +30,14 @@ class PeerNode:
         self.central_port = central_port
         self.peer_host = peer_host
         self.peer_port = peer_port
+        self.file_server_socket = None
+        self.stop_event = threading.Event()
 
         os.makedirs(self.shared_dir, exist_ok=True)
 
     def central_request(self, data):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(5)
             sock.connect((self.central_host, self.central_port))
             send_json(sock, data)
             return recv_json(sock)
@@ -133,23 +136,33 @@ class PeerNode:
 
     def start_file_server(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.file_server_socket = server
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server.bind((self.peer_host, self.peer_port))
         server.listen(10)
+        server.settimeout(0.5)
 
         print(
             f"Peer démarré sur "
             f"{self.peer_host}:{self.peer_port}"
         )
 
-        while True:
-            client, address = server.accept()
+        while not self.stop_event.is_set():
+            try:
+                client, address = server.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                break
 
             threading.Thread(
                 target=self.send_file,
                 args=(client, address),
                 daemon=True,
             ).start()
+
+        server.close()
+        self.file_server_socket = None
 
     def send_file(self, client, address):
         try:
@@ -196,6 +209,7 @@ class PeerNode:
             client.close()
 
     def start(self):
+        self.stop_event.clear()
         threading.Thread(
             target=self.start_file_server,
             daemon=True,
@@ -212,9 +226,22 @@ class PeerNode:
         publish_result = self.publish_files()
         print("Publication :", publish_result)
 
-        while True:
+        while not self.stop_event.is_set():
             time.sleep(30)
-            self.ping()
+            if not self.stop_event.is_set():
+                self.ping()
+
+    def logout_peer(self):
+        self.stop_event.set()
+        if self.file_server_socket is not None:
+            try:
+                self.file_server_socket.close()
+            except OSError:
+                pass
+        return self.central_request({
+            "cmd": "LOGOUT",
+            "username": self.username,
+        })
 
 
 def main():

@@ -125,3 +125,18 @@ module `unittest` inclus avec Python :
 python3 -m unittest discover -v
 ```
 
+## Interfaces graphiques
+
+L'application fournit une interface Tkinter moderne avec un lanceur unique :
+
+```bash
+python3 app.py
+```
+
+Les interfaces peuvent aussi être démarrées séparément :
+
+```bash
+python3 central_gui.py
+python3 peer_gui.py
+```
+

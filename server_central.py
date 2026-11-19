@@ -21,6 +21,8 @@ class CentralServer:
         self.peers = {}
         self.file_index = defaultdict(list)
         self.lock = threading.Lock()
+        self.server_socket = None
+        self.stop_event = threading.Event()
 
     def register(self, username, password):
         if not username or not password:
@@ -249,24 +251,50 @@ class CentralServer:
             client_socket.close()
 
     def cleanup_loop(self):
-        while True:
-            time.sleep(30)
-            self.remove_inactive_peers()
+        while not self.stop_event.is_set():
+            self.stop_event.wait(30)
+            if not self.stop_event.is_set():
+                self.remove_inactive_peers()
+
+    def snapshot(self):
+        with self.lock:
+            users = sorted(self.users)
+            peers = [
+                {
+                    "username": username,
+                    "host": peer["host"],
+                    "port": peer["port"],
+                    "files": len(peer["files"]),
+                    "last_seen": peer["last_seen"],
+                }
+                for username, peer in sorted(self.peers.items())
+            ]
+        return {"users": users, "peers": peers, "indexed": len(self.file_index)}
+
+    def stop(self):
+        self.stop_event.set()
+        if self.server_socket is not None:
+            try:
+                self.server_socket.close()
+            except OSError:
+                pass
 
     def start(self):
+        self.stop_event.clear()
         server_socket = socket.socket(
             socket.AF_INET,
             socket.SOCK_STREAM,
         )
+        self.server_socket = server_socket
 
         server_socket.setsockopt(
             socket.SOL_SOCKET,
             socket.SO_REUSEADDR,
             1,
         )
-
         server_socket.bind((self.host, self.port))
         server_socket.listen(20)
+        server_socket.settimeout(0.5)
 
         threading.Thread(
             target=self.cleanup_loop,
@@ -279,8 +307,13 @@ class CentralServer:
         )
 
         try:
-            while True:
-                client_socket, client_address = server_socket.accept()
+            while not self.stop_event.is_set():
+                try:
+                    client_socket, client_address = server_socket.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
 
                 threading.Thread(
                     target=self.handle_client,
