@@ -103,6 +103,7 @@ class CentralServer:
                 entry = {
                     "username": username,
                     "filename": filename,
+                    "relative_path": file_info.get("relative_path", filename),
                     "description": description,
                     "peer_host": peer["host"],
                     "peer_port": peer["port"],

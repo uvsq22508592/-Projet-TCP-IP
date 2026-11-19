@@ -69,6 +69,10 @@ class PeerGui:
         actions.pack(fill="x", pady=10)
         make_button(actions, "S'inscrire", self.register).pack(side="left")
         make_button(actions, "Se connecter", self.login).pack(side="left", padx=8)
+        make_button(actions, "Actualiser les fichiers", self.publish).pack(
+            side="left",
+            padx=8,
+        )
         self.logout_button = make_button(actions, "Se déconnecter", self.logout, danger=True)
 
         self.status = tk.Label(
@@ -166,19 +170,54 @@ class PeerGui:
         if peer is None:
             return
         try:
+            self.peer = peer
+            threading.Thread(target=peer.start_file_server, daemon=True).start()
+            if not peer.file_server_ready.wait(2):
+                raise ConnectionError("Le serveur de fichiers ne démarre pas")
+            if peer.file_server_error is not None:
+                raise peer.file_server_error
+
             login_result = peer.login()
             if login_result.get("status") != "OK":
                 messagebox.showerror("Connexion", login_result.get("message", "Échec"))
+                peer.logout_peer()
+                self.peer = None
                 return
-            peer.publish_files()
-            self.peer = peer
-            threading.Thread(target=peer.start_file_server, daemon=True).start()
+            publish_result = peer.publish_files()
+            if publish_result.get("status") != "OK":
+                messagebox.showerror(
+                    "Publication",
+                    publish_result.get("message", "Publication impossible"),
+                )
+                peer.logout_peer()
+                self.peer = None
+                return
             threading.Thread(target=peer_ping_loop, args=(peer,), daemon=True).start()
             self.running = True
             self.status.configure(text="● En ligne", fg=COLORS["success"])
             self.logout_button.pack(side="left", padx=8)
         except OSError as error:
+            self.peer = None
             messagebox.showerror("Connexion impossible", str(error))
+
+    def publish(self):
+        if self.peer is None or not self.running:
+            messagebox.showwarning(
+                "Publication",
+                "Connectez-vous avant de publier les fichiers.",
+            )
+            return
+        try:
+            result = self.peer.publish_files()
+            if result.get("status") != "OK":
+                messagebox.showerror(
+                    "Publication",
+                    result.get("message", "Publication impossible"),
+                )
+                return
+            messagebox.showinfo("Publication", result.get("message", "Fichiers publiés"))
+        except OSError as error:
+            messagebox.showerror("Publication impossible", str(error))
 
     def logout(self):
         if not self.running or self.peer is None:
@@ -242,7 +281,7 @@ class PeerGui:
             result = peer.download_file(
                 file_info["peer_host"],
                 file_info["peer_port"],
-                file_info["filename"],
+                file_info.get("relative_path", file_info["filename"]),
                 destination,
             )
             messagebox.showinfo(

@@ -30,6 +30,10 @@ class CentralServerTests(unittest.TestCase):
         result = self.server.search("JAZZ")
         self.assertEqual(result["status"], "OK")
         self.assertEqual(result["results"][0]["filename"], "song.mp3")
+        self.assertEqual(
+            result["results"][0]["relative_path"],
+            "song.mp3",
+        )
         self.assertEqual(result["results"][0]["peer_port"], 6001)
 
     def test_duplicate_registration_and_invalid_login(self):

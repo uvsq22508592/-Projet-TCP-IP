@@ -59,6 +59,24 @@ def configure_theme(root):
         foreground=COLORS["text"],
         font=("Segoe UI", 24, "bold"),
     )
+    style.configure(
+        "Treeview",
+        background=COLORS["surface"],
+        fieldbackground=COLORS["surface"],
+        foreground=COLORS["text"],
+        rowheight=28,
+    )
+    style.configure(
+        "Treeview.Heading",
+        background=COLORS["surface_light"],
+        foreground=COLORS["text"],
+        font=("Segoe UI", 10, "bold"),
+    )
+    style.map(
+        "Treeview",
+        background=[("selected", COLORS["primary"])],
+        foreground=[("selected", "white")],
+    )
 
 
 def create_card(parent, title):

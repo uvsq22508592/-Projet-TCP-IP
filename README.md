@@ -75,6 +75,10 @@ python3 peer_node.py \
 
 Lancer chaque utilisateur avec un port pair différent.
 
+Le dossier partagé est parcouru récursivement : les fichiers placés dans des
+sous-dossiers sont également publiés. Dans l'interface Peer, utilisez
+**Actualiser les fichiers** après avoir ajouté ou supprimé un fichier.
+
 ### 5. Recherche et téléchargement
 
 Une recherche renvoie le nom du fichier ainsi que l'adresse du peer :
@@ -101,6 +105,10 @@ python3 peer_node.py \
 
 Le protocole de transfert utilise une réponse JSON contenant la taille du
 fichier, suivie des octets du fichier sur la même connexion TCP.
+
+Pour une connexion entre deux ordinateurs, remplacez `127.0.0.1` par
+l'adresse IP locale de l'ordinateur qui héberge le peer et autorisez les ports
+`5000` et `6001` dans le pare-feu.
 
 ## Structure des fichiers
 

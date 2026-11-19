@@ -31,6 +31,8 @@ class PeerNode:
         self.peer_host = peer_host
         self.peer_port = peer_port
         self.file_server_socket = None
+        self.file_server_ready = threading.Event()
+        self.file_server_error = None
         self.stop_event = threading.Event()
 
         os.makedirs(self.shared_dir, exist_ok=True)
@@ -135,12 +137,23 @@ class PeerNode:
         })
 
     def start_file_server(self):
+        self.file_server_ready.clear()
+        self.file_server_error = None
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.file_server_socket = server
-        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server.bind((self.peer_host, self.peer_port))
-        server.listen(10)
-        server.settimeout(0.5)
+        try:
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind((self.peer_host, self.peer_port))
+            server.listen(10)
+            server.settimeout(0.5)
+        except OSError as error:
+            self.file_server_error = error
+            self.file_server_ready.set()
+            server.close()
+            self.file_server_socket = None
+            return
+
+        self.file_server_ready.set()
 
         print(
             f"Peer démarré sur "
@@ -175,8 +188,20 @@ class PeerNode:
                 })
                 return
 
-            filename = os.path.basename(request.get("filename", ""))
-            path = os.path.join(self.shared_dir, filename)
+            requested_path = request.get("filename", "")
+            relative_path = os.path.normpath(requested_path)
+            shared_root = os.path.abspath(self.shared_dir)
+            path = os.path.abspath(os.path.join(shared_root, relative_path))
+
+            if (
+                relative_path in ("", ".")
+                or os.path.commonpath((shared_root, path)) != shared_root
+            ):
+                send_json(client, {
+                    "status": "ERROR",
+                    "message": "Chemin de fichier invalide",
+                })
+                return
 
             if not os.path.isfile(path):
                 send_json(client, {
@@ -189,7 +214,7 @@ class PeerNode:
 
             send_json(client, {
                 "status": "OK",
-                "filename": filename,
+                "filename": relative_path,
                 "size": size,
             })
 
@@ -215,7 +240,10 @@ class PeerNode:
             daemon=True,
         ).start()
 
-        time.sleep(0.5)
+        self.file_server_ready.wait(2)
+        if self.file_server_error is not None:
+            print(f"Erreur serveur peer : {self.file_server_error}")
+            return
 
         login_result = self.login()
         print("Connexion :", login_result)
