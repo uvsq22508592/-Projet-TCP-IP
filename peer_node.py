@@ -90,43 +90,72 @@ class PeerNode:
             "cmd": "LIST_FILES",
         })
 
-    def download_file(self, peer_host, peer_port, filename, destination_path):
+    def download_file(
+        self,
+        peer_host,
+        peer_port,
+        filename,
+        destination_path,
+        owner=None,
+    ):
         """Download a shared file from another peer."""
         destination_path = os.path.abspath(destination_path)
         destination_dir = os.path.dirname(destination_path)
         os.makedirs(destination_dir, exist_ok=True)
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((peer_host, int(peer_port)))
-            send_json(sock, {
-                "cmd": "GET_FILE",
-                "filename": filename,
-            })
+        transfer_status = "FAILED"
+        received_size = 0
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.connect((peer_host, int(peer_port)))
+                send_json(sock, {
+                    "cmd": "GET_FILE",
+                    "filename": filename,
+                })
 
-            response = recv_json(sock)
-            if response is None:
-                raise ConnectionError("Réponse du peer absente")
+                response = recv_json(sock)
+                if response is None:
+                    raise ConnectionError("Réponse du peer absente")
 
-            if response.get("status") != "OK":
-                raise RuntimeError(response.get(
-                    "message",
-                    "Téléchargement refusé",
-                ))
+                if response.get("status") != "OK":
+                    raise RuntimeError(response.get(
+                        "message",
+                        "Téléchargement refusé",
+                    ))
 
-            expected_size = response.get("size")
-            if not isinstance(expected_size, int) or expected_size < 0:
-                raise ValueError("Taille de fichier invalide")
+                expected_size = response.get("size")
+                if not isinstance(expected_size, int) or expected_size < 0:
+                    raise ValueError("Taille de fichier invalide")
 
-            received_size = 0
-            with open(destination_path, "wb") as file:
-                while received_size < expected_size:
-                    data = sock.recv(min(65536, expected_size - received_size))
-                    if not data:
-                        raise ConnectionError(
-                            "Connexion interrompue pendant le téléchargement"
+                with open(destination_path, "wb") as file:
+                    while received_size < expected_size:
+                        data = sock.recv(
+                            min(65536, expected_size - received_size)
                         )
-                    file.write(data)
-                    received_size += len(data)
+                        if not data:
+                            raise ConnectionError(
+                                "Connexion interrompue pendant le téléchargement"
+                            )
+                        file.write(data)
+                        received_size += len(data)
+
+            transfer_status = "SUCCESS"
+        except Exception:
+            raise
+        finally:
+            try:
+                self.central_request({
+                    "cmd": "DOWNLOAD_EVENT",
+                    "username": self.username,
+                    "password": self.password,
+                    "owner": owner or "",
+                    "filename": os.path.basename(filename),
+                    "relative_path": filename,
+                    "size": received_size,
+                    "status": transfer_status,
+                })
+            except OSError:
+                pass
 
         return {
             "status": "OK",

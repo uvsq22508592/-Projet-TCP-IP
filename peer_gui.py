@@ -124,6 +124,7 @@ class PeerGui:
         table_frame.pack(fill="both", expand=True, pady=(14, 0))
         columns = ("Fichier", "Utilisateur", "Adresse", "Port", "Description")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings")
+        self.tree.configure(selectmode="extended")
         for column in columns:
             self.tree.heading(column, text=column)
             self.tree.column(column, width=170)
@@ -291,29 +292,75 @@ class PeerGui:
         if not selection:
             messagebox.showwarning("Téléchargement", "Sélectionnez un fichier.")
             return
-        index = self.tree.index(selection[0])
-        file_info = self.search_results[index]
-        destination = filedialog.asksaveasfilename(
-            initialfile=file_info["filename"],
-        )
-        if not destination:
-            return
+
         peer = self.peer or self.create_peer()
         if peer is None:
             return
-        try:
-            result = peer.download_file(
-                file_info["peer_host"],
-                file_info["peer_port"],
-                file_info.get("relative_path", file_info["filename"]),
-                destination,
+
+        if len(selection) == 1:
+            index = self.tree.index(selection[0])
+            file_info = self.search_results[index]
+            destination = filedialog.asksaveasfilename(
+                initialfile=file_info["filename"],
             )
-            messagebox.showinfo(
-                "Téléchargement",
-                f"Fichier enregistré :\n{result['path']}",
+            if not destination:
+                return
+            try:
+                result = peer.download_file(
+                    file_info["peer_host"],
+                    file_info["peer_port"],
+                    file_info.get("relative_path", file_info["filename"]),
+                    destination,
+                    owner=file_info["username"],
+                )
+                messagebox.showinfo(
+                    "Téléchargement",
+                    f"Fichier enregistré :\n{result['path']}",
+                )
+            except (ConnectionError, OSError, RuntimeError, ValueError) as error:
+                messagebox.showerror("Téléchargement impossible", str(error))
+            return
+
+        destination_dir = filedialog.askdirectory(
+            title="Choisir le dossier de destination",
+        )
+        if not destination_dir:
+            return
+
+        successes = 0
+        failures = []
+        for item in selection:
+            index = self.tree.index(item)
+            file_info = self.search_results[index]
+            relative_path = file_info.get(
+                "relative_path",
+                file_info["filename"],
             )
-        except (ConnectionError, OSError, RuntimeError, ValueError) as error:
-            messagebox.showerror("Téléchargement impossible", str(error))
+            destination = os.path.abspath(
+                os.path.join(
+                    destination_dir,
+                    file_info["username"],
+                    relative_path,
+                )
+            )
+            try:
+                peer.download_file(
+                    file_info["peer_host"],
+                    file_info["peer_port"],
+                    relative_path,
+                    destination,
+                    owner=file_info["username"],
+                )
+                successes += 1
+            except (ConnectionError, OSError, RuntimeError, ValueError) as error:
+                failures.append(
+                    f"{relative_path}: {error}"
+                )
+
+        message = f"{successes} fichier(s) téléchargé(s)."
+        if failures:
+            message += "\n\n" + "\n".join(failures)
+        messagebox.showinfo("Téléchargements multiples", message)
 
     def close(self):
         self.logout()

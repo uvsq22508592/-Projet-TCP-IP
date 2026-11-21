@@ -1,5 +1,7 @@
 import argparse
+import os
 import socket
+import sqlite3
 import threading
 import time
 from collections import defaultdict
@@ -14,7 +16,7 @@ from common import (
 
 
 class CentralServer:
-    def __init__(self, host="0.0.0.0", port=DEFAULT_PORT):
+    def __init__(self, host="0.0.0.0", port=DEFAULT_PORT, db_path=None):
         self.host = host
         self.port = port
         self.users = {}
@@ -23,6 +25,106 @@ class CentralServer:
         self.lock = threading.Lock()
         self.server_socket = None
         self.stop_event = threading.Event()
+        if db_path is None:
+            db_path = os.path.join(
+                os.path.dirname(__file__),
+                "logs",
+                "transfers.db",
+            )
+        self.db_path = db_path
+        os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
+        self.init_download_database()
+
+    def init_download_database(self):
+        with sqlite3.connect(self.db_path) as database:
+            database.execute(
+                """
+                CREATE TABLE IF NOT EXISTS downloads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp REAL NOT NULL,
+                    requester TEXT NOT NULL,
+                    owner TEXT NOT NULL,
+                    filename TEXT NOT NULL,
+                    relative_path TEXT NOT NULL,
+                    size INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    requester_ip TEXT
+                )
+                """
+            )
+
+    def report_download(
+        self,
+        requester,
+        password,
+        owner,
+        filename,
+        relative_path,
+        size,
+        status,
+        requester_ip,
+    ):
+        with self.lock:
+            saved_password = self.users.get(requester)
+            peer = self.peers.get(requester)
+
+            if (
+                saved_password is None
+                or saved_password != sha256_password(password)
+                or peer is None
+            ):
+                return {
+                    "status": "ERROR",
+                    "message": "Téléchargeur non authentifié",
+                }
+
+        timestamp = time.time()
+        with sqlite3.connect(self.db_path) as database:
+            database.execute(
+                """
+                INSERT INTO downloads (
+                    timestamp, requester, owner, filename, relative_path,
+                    size, status, requester_ip
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    timestamp,
+                    requester,
+                    owner,
+                    filename,
+                    relative_path,
+                    int(size or 0),
+                    status,
+                    requester_ip,
+                ),
+            )
+
+        return {
+            "status": "OK",
+            "message": "Téléchargement enregistré",
+        }
+
+    def download_history(self, limit=100):
+        with sqlite3.connect(self.db_path) as database:
+            database.row_factory = sqlite3.Row
+            rows = database.execute(
+                """
+                SELECT timestamp, requester, owner, filename, relative_path,
+                       size, status, requester_ip
+                FROM downloads
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        return [dict(row) for row in rows]
+
+    def download_count(self):
+        with sqlite3.connect(self.db_path) as database:
+            return database.execute(
+                "SELECT COUNT(*) FROM downloads"
+            ).fetchone()[0]
 
     def register(self, username, password):
         if not username or not password:
@@ -246,6 +348,18 @@ class CentralServer:
         if command == "LOGOUT":
             return self.logout(request.get("username"))
 
+        if command == "DOWNLOAD_EVENT":
+            return self.report_download(
+                requester=request.get("username"),
+                password=request.get("password"),
+                owner=request.get("owner", ""),
+                filename=request.get("filename", ""),
+                relative_path=request.get("relative_path", ""),
+                size=request.get("size", 0),
+                status=request.get("status", "UNKNOWN"),
+                requester_ip=client_address[0],
+            )
+
         return {
             "status": "ERROR",
             "message": "Commande inconnue",
@@ -300,7 +414,13 @@ class CentralServer:
                 }
                 for username, peer in sorted(self.peers.items())
             ]
-        return {"users": users, "peers": peers, "indexed": len(self.file_index)}
+        return {
+            "users": users,
+            "peers": peers,
+            "indexed": len(self.file_index),
+            "downloads": self.download_count(),
+            "download_history": self.download_history(20),
+        }
 
     def stop(self):
         self.stop_event.set()

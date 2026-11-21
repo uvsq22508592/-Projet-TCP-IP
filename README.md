@@ -120,6 +120,23 @@ Pour une connexion entre deux ordinateurs, remplacez `127.0.0.1` par
 l'adresse IP locale de l'ordinateur qui héberge le peer et autorisez les ports
 `5000` et `6001` dans le pare-feu.
 
+## Sélection multiple et historique
+
+Dans l'interface Peer, maintenez `Ctrl` ou `Maj` pour sélectionner plusieurs
+fichiers dans les résultats. Le bouton **Télécharger la sélection** demande
+alors un dossier de destination et conserve les sous-dossiers des fichiers.
+
+Chaque téléchargement terminé ou interrompu est envoyé au serveur central.
+L'historique persistant est enregistré dans `logs/transfers.db` avec :
+
+* la date et l'heure ;
+* l'utilisateur ayant téléchargé ;
+* le propriétaire du fichier ;
+* le chemin du fichier ;
+* la taille transférée ;
+* le statut `SUCCESS` ou `FAILED` ;
+* l'adresse IP du téléchargeur.
+
 ## Structure des fichiers
 
 * `server_central.py` : authentification, sessions, index et recherche.

@@ -1,11 +1,19 @@
 import unittest
+import tempfile
+import os
 
 from server_central import CentralServer
 
 
 class CentralServerTests(unittest.TestCase):
     def setUp(self):
-        self.server = CentralServer()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.server = CentralServer(
+            db_path=os.path.join(self.temp_dir.name, "transfers.db")
+        )
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
 
     def test_register_login_publish_and_search(self):
         self.assertEqual(
@@ -60,6 +68,29 @@ class CentralServerTests(unittest.TestCase):
 
         self.assertEqual(self.server.logout("alice")["status"], "OK")
         self.assertEqual(self.server.search("document")["results"], [])
+
+    def test_download_event_is_persisted_with_requester(self):
+        self.server.register("alice", "secret")
+        self.server.login("alice", "secret", "127.0.0.1", 6001)
+
+        result = self.server.report_download(
+            requester="alice",
+            password="secret",
+            owner="bob",
+            filename="cours.pdf",
+            relative_path="documents/cours.pdf",
+            size=1250,
+            status="SUCCESS",
+            requester_ip="127.0.0.1",
+        )
+
+        self.assertEqual(result["status"], "OK")
+        self.assertEqual(self.server.download_count(), 1)
+        history = self.server.download_history()
+        self.assertEqual(history[0]["requester"], "alice")
+        self.assertEqual(history[0]["owner"], "bob")
+        self.assertEqual(history[0]["filename"], "cours.pdf")
+        self.assertEqual(history[0]["status"], "SUCCESS")
 
     def test_list_all_published_files_from_multiple_peers(self):
         self.server.register("alice", "secret")

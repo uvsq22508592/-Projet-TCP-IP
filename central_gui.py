@@ -33,13 +33,15 @@ class CentralGui:
 
         cards = ttk.Frame(main)
         cards.pack(fill="x")
-        cards.columnconfigure((0, 1, 2), weight=1)
+        cards.columnconfigure((0, 1, 2, 3), weight=1)
         self.users_card, self.users_value = create_card(cards, "UTILISATEURS")
         self.peers_card, self.peers_value = create_card(cards, "PEERS ACTIFS")
         self.index_card, self.index_value = create_card(cards, "MOTS INDEXÉS")
+        self.downloads_card, self.downloads_value = create_card(cards, "TÉLÉCHARGEMENTS")
         self.users_card.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         self.peers_card.grid(row=0, column=1, sticky="nsew", padx=8)
         self.index_card.grid(row=0, column=2, sticky="nsew", padx=(8, 0))
+        self.downloads_card.grid(row=0, column=3, sticky="nsew", padx=(8, 0))
 
         toolbar = ttk.Frame(main)
         toolbar.pack(fill="x", pady=(18, 10))
@@ -94,6 +96,7 @@ class CentralGui:
         self.users_value.configure(text=str(len(snapshot["users"])))
         self.peers_value.configure(text=str(len(snapshot["peers"])))
         self.index_value.configure(text=str(snapshot["indexed"]))
+        self.downloads_value.configure(text=str(snapshot["downloads"]))
 
         for item in self.tree.get_children():
             self.tree.delete(item)
