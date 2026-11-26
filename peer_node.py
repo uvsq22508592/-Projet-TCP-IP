@@ -35,7 +35,8 @@ class PeerNode:
         self.file_server_error = None
         self.stop_event = threading.Event()
 
-        os.makedirs(self.shared_dir, exist_ok=True)
+        if not os.path.isfile(self.shared_dir):
+            os.makedirs(self.shared_dir, exist_ok=True)
 
     def central_request(self, data):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -224,18 +225,32 @@ class PeerNode:
 
             requested_path = request.get("filename", "")
             relative_path = os.path.normpath(requested_path)
-            shared_root = os.path.abspath(self.shared_dir)
-            path = os.path.abspath(os.path.join(shared_root, relative_path))
-
-            if (
-                relative_path in ("", ".")
-                or os.path.commonpath((shared_root, path)) != shared_root
-            ):
+            shared_path = os.path.realpath(self.shared_dir)
+            if relative_path in ("", "."):
                 send_json(client, {
                     "status": "ERROR",
                     "message": "Chemin de fichier invalide",
                 })
                 return
+
+            if os.path.isfile(shared_path):
+                if relative_path != os.path.basename(shared_path):
+                    send_json(client, {
+                        "status": "ERROR",
+                        "message": "Chemin de fichier invalide",
+                    })
+                    return
+                path = shared_path
+            else:
+                path = os.path.realpath(
+                    os.path.join(shared_path, relative_path)
+                )
+                if os.path.commonpath((shared_path, path)) != shared_path:
+                    send_json(client, {
+                        "status": "ERROR",
+                        "message": "Chemin de fichier invalide",
+                    })
+                    return
 
             if not os.path.isfile(path):
                 send_json(client, {

@@ -52,7 +52,7 @@ class PeerGui:
 
         shared_row = ttk.Frame(self.connection_tab)
         shared_row.pack(fill="x", pady=(18, 12))
-        ttk.Label(shared_row, text="Dossier partagé").pack(side="left")
+        ttk.Label(shared_row, text="Fichier ou dossier partagé").pack(side="left")
         self.shared_dir = tk.StringVar(value=os.path.abspath("shared"))
         tk.Entry(
             shared_row,
@@ -63,7 +63,13 @@ class PeerGui:
             relief="flat",
             width=56,
         ).pack(side="left", padx=10, fill="x", expand=True)
-        make_button(shared_row, "Parcourir", self.choose_directory).pack(side="left")
+        make_button(shared_row, "Choisir dossier", self.choose_directory).pack(
+            side="left",
+        )
+        make_button(shared_row, "Choisir fichier", self.choose_file).pack(
+            side="left",
+            padx=(8, 0),
+        )
 
         actions = ttk.Frame(self.connection_tab)
         actions.pack(fill="x", pady=10)
@@ -140,9 +146,20 @@ class PeerGui:
         )
 
     def choose_directory(self):
-        directory = filedialog.askdirectory(initialdir=self.shared_dir.get())
+        directory = filedialog.askdirectory(initialdir=self.shared_initialdir())
         if directory:
             self.shared_dir.set(directory)
+
+    def choose_file(self):
+        filename = filedialog.askopenfilename(initialdir=self.shared_initialdir())
+        if filename:
+            self.shared_dir.set(filename)
+
+    def shared_initialdir(self):
+        path = self.shared_dir.get()
+        if os.path.isfile(path):
+            path = os.path.dirname(path)
+        return path if os.path.isdir(path) else os.getcwd()
 
     def create_peer(self):
         try:

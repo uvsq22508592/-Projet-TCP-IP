@@ -76,6 +76,18 @@ def recv_json(sock):
 def list_shared_files(shared_dir):
     files = []
 
+    if os.path.isfile(shared_dir):
+        relative_path = os.path.basename(shared_dir)
+        return [{
+            "name": relative_path,
+            "relative_path": relative_path,
+            "size": os.path.getsize(shared_dir),
+            "description": f"Fichier partagé : {relative_path}",
+        }]
+
+    if not os.path.isdir(shared_dir):
+        return files
+
     for root, _, filenames in os.walk(shared_dir):
         for filename in filenames:
             path = os.path.join(root, filename)

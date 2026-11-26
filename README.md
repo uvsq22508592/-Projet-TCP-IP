@@ -75,9 +75,12 @@ python3 peer_node.py \
 
 Lancer chaque utilisateur avec un port pair différent.
 
-Le dossier partagé est parcouru récursivement : les fichiers placés dans des
-sous-dossiers sont également publiés. Dans l'interface Peer, utilisez
-**Actualiser les fichiers** après avoir ajouté ou supprimé un fichier.
+Le chemin partagé peut désigner un dossier ou un seul fichier. Un dossier est
+parcouru récursivement : les fichiers placés dans ses sous-dossiers sont
+également publiés. Dans l'interface Peer, choisissez **Choisir dossier** ou
+**Choisir fichier**. En ligne de commande, `--shared-dir` accepte également un
+chemin de fichier. Utilisez **Actualiser les fichiers** après avoir ajouté ou
+supprimé un fichier.
 
 ### 5. Recherche et téléchargement
 

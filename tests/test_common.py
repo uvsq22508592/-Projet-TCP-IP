@@ -43,6 +43,19 @@ class CommonTests(unittest.TestCase):
         self.assertEqual(files[0]["relative_path"], os.path.join("albums", "song.mp3"))
         self.assertEqual(files[0]["size"], 5)
 
+    def test_list_shared_files_accepts_a_single_file(self):
+        with tempfile.TemporaryDirectory() as shared_dir:
+            path = os.path.join(shared_dir, "document.pdf")
+            with open(path, "wb") as file:
+                file.write(b"content")
+
+            files = list_shared_files(path)
+
+        self.assertEqual(len(files), 1)
+        self.assertEqual(files[0]["name"], "document.pdf")
+        self.assertEqual(files[0]["relative_path"], "document.pdf")
+        self.assertEqual(files[0]["size"], 7)
+
 
 if __name__ == "__main__":
     unittest.main()
